@@ -6,4 +6,4 @@ This is the github page for our team Capstone project: Short and Sparse Deconvol
 ## Approaches
 [Nonconvex Optimization](https://github.com/Heimine/Sparse_Deconvolution-Capstone/tree/master/Optimization)
 
-Deep Learning
+[Deep Learning](https://github.com/Heimine/Sparse_Deconvolution-Capstone/tree/master/Deep_Learning)

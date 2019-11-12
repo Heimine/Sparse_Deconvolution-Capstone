@@ -1,5 +1,6 @@
 # generate the groudtruth data
 # y = sum_{k=1}^K a0k conv x0k + b*1 + n
+import numpy as np
 def gen_data_2D_with_time(arg, pattern = False):
     """
     Parameters:
@@ -58,8 +59,14 @@ def gen_data_2D_with_time(arg, pattern = False):
     a_0 = a_0 / np.max(np.linalg.eig(a_0)[0])
     
     if pattern == False:
+        #### Change: For the purpose of avoiding possible index reflection caused by circular convolution
+        # we first generate X on a relatively small image compared to the actual image size we want,
+        # and then zero pad it to the actual image
         # Generate the spike train x_0
-        m_0, m_1 = x_grid
+        m_0_true, m_1_true = x_grid
+        m_0 = m_0_true - 2 * n
+        m_1 = m_1_true - 2 * n
+        
         case_x = x_type.lower()
         if case_x == "bernoulli":
             X_0 = (np.random.uniform(size = [m_0, m_1]) <= theta).astype(int) # Bernoulli spike train
@@ -77,6 +84,9 @@ def gen_data_2D_with_time(arg, pattern = False):
                 indices = (X_0 < 0)
                 X_0[indices] = 1 / (1 + np.exp(-X_0[indices]))
                 
+        # Now zero pad x to the actual image size we want
+        X_0 = np.pad(X_0, (n, n), "constant", constant_values= 0)
+                
     else:# If we want to use some image with some patterns on it
         m_0, m_1 = X_0.shape
     
@@ -88,17 +98,17 @@ def gen_data_2D_with_time(arg, pattern = False):
     # a suitable z (number of shining points at a time step),
     # I see this as a complexed version of the Coupon collecting problem, although not the same
     # we could use the solution to that problem as a guideline.
-    X_with_time = np.zeros([m_0, m_1, T]) # Samples we take at each time step
-    y_with_time = np.zeros([m_0, m_1, T]) # The blurred y we want to return, where y[:,:,t] means
+    X_with_time = np.zeros([m_0_true, m_1_true, T]) # Samples we take at each time step
+    y_with_time = np.zeros([m_0_true, m_1_true, T]) # The blurred y we want to return, where y[:,:,t] means
                                           # y at time step t
     # We first calculate a lower bound for z using the idea of Coupon collecting problem
     def solving_ccp(total_entries, T): # Giving a lower bound of z
         # total entries denote number of non-zero entries in the input
-        z = 100 # initialize z
+        z = 1 # initialize z
         gamma = 0.577216 # Euler–Mascheroni constant
         ratio = total_entries // z
         while ratio * np.log(ratio) + gamma * ratio + 0.5 > T:
-            z += 10
+            z += 1
             ratio = total_entries // z
         
         return z
@@ -115,19 +125,19 @@ def gen_data_2D_with_time(arg, pattern = False):
         # Take random samples from indexes
         random_samples = np.random.randint(0, total_entries, z)
         index_to_take = [indexes[i][random_samples] for i in range(len(indexes))]
-        current_X = np.zeros([m_0, m_1])
+        current_X = np.zeros([m_0_true, m_1_true])
         current_X[tuple(index_to_take)] = X_0[tuple(index_to_take)]
         X_with_time[:,:,t] = current_X
 
         # generate the data y = a_0 conv b_0 + bias + noise
         ##### Circular convolution alert
-        y_0 = cconv(a_0, current_X, [m_0, m_1]) + b * np.ones([m_0,m_1])
-        current_y = y_0 + np.random.normal(size = [m_0, m_1]) * noise_level
+        y_0 = cconv(a_0, current_X, [m_0_true, m_1_true]) + b * np.ones([m_0_true, m_1_true])
+        current_y = y_0 + np.random.normal(size = [m_0_true, m_1_true]) * noise_level
         y_with_time[:,:,t] = current_y
     
     # We also return a blurred image of X_0 without sampling
-    y_total = cconv(a_0, X_0, [m_0, m_1]) + b * np.ones([m_0,m_1])
-    y_total = y_total + np.random.normal(size = [m_0, m_1]) * noise_level
+    y_total = cconv(a_0, X_0, [m_0_true, m_1_true]) + b * np.ones([m_0_true, m_1_true])
+    y_total = y_total + np.random.normal(size = [m_0_true, m_1_true]) * noise_level
         
     return [X_0, X_with_time, y_with_time, y_total]
 
